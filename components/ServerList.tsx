@@ -139,8 +139,14 @@ export function ServerList({ servers, isLoading, error, onRetry }: ServerListPro
 
                                 {/* Server grid */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {subgroupServers.map((server, index) => (
-                                        <ServerCard key={server.uuid || `server-${index}`} server={server} />
+                                    {subgroupServers.sort((a, b) => {
+                                        // Sort online servers first
+                                        if (a.status === 'online' && b.status !== 'online') return -1;
+                                        if (a.status !== 'online' && b.status === 'online') return 1;
+                                        // If statuses are same priority (both online or both not), sort by name
+                                        return a.name.localeCompare(b.name);
+                                    }).map((server, index) => (
+                                        <ServerCard key={server.uuid || `server-${index}`} server={server} onRefresh={onRetry} />
                                     ))}
                                 </div>
                             </div>
@@ -159,8 +165,12 @@ export function ServerList({ servers, isLoading, error, onRetry }: ServerListPro
                         </h2>
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {ungrouped.map((server, index) => (
-                            <ServerCard key={server.uuid || `server-${index}`} server={server} />
+                        {ungrouped.sort((a, b) => {
+                            if (a.status === 'online' && b.status !== 'online') return -1;
+                            if (a.status !== 'online' && b.status === 'online') return 1;
+                            return a.name.localeCompare(b.name);
+                        }).map((server, index) => (
+                            <ServerCard key={server.uuid || `server-${index}`} server={server} onRefresh={onRetry} />
                         ))}
                     </div>
                 </div>

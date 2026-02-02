@@ -1,4 +1,5 @@
 import { PelicanServer, Server, ServerStatus } from '@/types/server';
+import { status as queryStatus } from 'minecraft-server-util';
 
 const PELICAN_PANEL_URL = process.env.PELICAN_PANEL_URL;
 const PELICAN_API_KEY = process.env.PELICAN_API_KEY;
@@ -216,16 +217,73 @@ export async function fetchServers(): Promise<Server[]> {
                     return server;
                 }
 
+                // Fetch resource status (running/offline)
                 const statusData = await fetchServerStatus(uuid);
                 const actualStatus = statusData.currentState || statusData.status;
+
+                let players: number | undefined;
+                let maxPlayers: number | undefined;
+                let playerList: string[] | undefined;
+
+                // Check if it's a Minecraft server and running
+                // We check egg attributes for "minecraft" (case insensitive) in name or description, or if explicitly tagged
+                // Note: We need access to the egg object itself. We fetched 'eggs' earlier.
+                // We can find the egg for this server using server.eggId
+                const egg = eggs.find((e: any) => (e.attributes?.id === server.eggId));
+                const isMinecraft = egg && (
+                    (egg.attributes?.name?.toLowerCase().includes('minecraft')) ||
+                    (egg.attributes?.description?.toLowerCase().includes('minecraft')) ||
+                    // Check for specific tag if we can see the egg structure. Assuming 'minecraft' string search is good for now.
+                    // User said "minecraft tag in the egg", so maybe check a 'tags' field?
+                    (egg.attributes?.tags?.includes && egg.attributes.tags.includes('minecraft'))
+                );
+
+                if (isMinecraft && actualStatus === 'running') {
+                    // Get connection details
+                    const env = serverData.container?.environment || {};
+                    const serverPort = parseInt(env['SERVER_PORT'] || '', 10);
+                    const port = parseInt(env['PORT'] || '', 10);
+
+                    // Use SERVER_PORT (standard Game Port) or generic PORT.
+                    // Do NOT use RCON_PORT for status ping as it doesn't support SLP.
+                    const queryPort = !isNaN(serverPort) ? serverPort : (!isNaN(port) ? port : undefined);
+
+                    // User requested to check the "Direct Address" (subdomain) if it has the minecraft tag
+                    const host = server.subdomain || server.domain;
+
+                    if (host) {
+                        try {
+                            // Pass the port if we have it, otherwise let the library resolve (e.g. via SRV)
+                            // Note: if queryPort is undefined, we pass undefined, and the library defaults to 25565
+                            const status = await queryStatus(host, queryPort || 25565, {
+                                timeout: 2000,
+                                enableSRV: false // SRV lookup disabled as per user request
+                            });
+
+                            if (status) {
+                                players = status.players.online;
+                                maxPlayers = status.players.max;
+                                if (status.players.sample) {
+                                    playerList = status.players.sample.map((p: any) => p.name);
+                                }
+                            }
+                        } catch (e) {
+                            console.warn(`Failed to query Minecraft server status for ${server.name} (${host}:${queryPort}):`, e);
+                        }
+                    }
+                }
 
                 console.log(`Server "${server.name}" status from resources API:`, actualStatus);
 
                 return {
                     ...server,
                     status: mapServerStatus(actualStatus),
+                    players,
+                    maxPlayers,
+                    playerList,
                 };
             })
+
         );
 
         return serversWithStatus;

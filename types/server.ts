@@ -53,6 +53,9 @@ export interface Server {
     eggUuid?: string; // Egg UUID for icon fallback
     isInstalled: boolean;
     updatedAt: string;
+    players?: number; // Current player count
+    maxPlayers?: number; // Max player count
+    playerList?: string[]; // List of online player names
 }
 
 export type ServerStatus = 'online' | 'offline' | 'starting' | 'stopping' | 'installing' | 'unknown';

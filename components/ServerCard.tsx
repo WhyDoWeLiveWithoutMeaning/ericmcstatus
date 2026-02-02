@@ -3,12 +3,15 @@ import { useState } from 'react';
 
 interface ServerCardProps {
     server: Server;
+    onRefresh?: () => void;
 }
 
-export function ServerCard({ server }: ServerCardProps) {
+export function ServerCard({ server, onRefresh }: ServerCardProps) {
     const [isStarting, setIsStarting] = useState(false);
     const [startError, setStartError] = useState<string>();
-    const statusConfig = {
+    const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
+
+    const statusConfig: Record<string, { color: string; text: string; pulse: boolean }> = {
         online: {
             color: 'bg-emerald-500',
             text: 'Online',
@@ -41,12 +44,16 @@ export function ServerCard({ server }: ServerCardProps) {
         },
     };
 
-    const config = statusConfig[server.status];
+    const currentStatus = optimisticStatus || server.status;
+    const config = statusConfig[currentStatus] || statusConfig.unknown;
 
     const handleStart = async () => {
         try {
             setIsStarting(true);
             setStartError(undefined);
+
+            // Optimistic update
+            setOptimisticStatus('starting');
 
             const response = await fetch(`/api/servers/${server.uuid}/power`, {
                 method: 'POST',
@@ -55,13 +62,18 @@ export function ServerCard({ server }: ServerCardProps) {
             });
 
             if (!response.ok) {
+                // Revert optimistic update on failure
+                setOptimisticStatus(null);
                 throw new Error('Failed to start server');
             }
 
-            // Refresh the page after a short delay to see the updated status
-            setTimeout(() => window.location.reload(), 2000);
+            // Trigger refresh after a delay to allow panel to process
+            if (onRefresh) {
+                setTimeout(() => onRefresh(), 2000);
+            }
         } catch (error) {
             setStartError(error instanceof Error ? error.message : 'Failed to start server');
+            setOptimisticStatus(null); // Revert on error
         } finally {
             setIsStarting(false);
         }
@@ -147,7 +159,7 @@ export function ServerCard({ server }: ServerCardProps) {
                         </span>
 
                         {/* Start button for offline servers with start permission */}
-                        {server.status === 'offline' && server.metadata['start'] === 'true' && (
+                        {currentStatus === 'offline' && server.metadata['start'] === 'true' && (
                             <button
                                 onClick={handleStart}
                                 disabled={isStarting}
@@ -180,6 +192,35 @@ export function ServerCard({ server }: ServerCardProps) {
                 {startError && (
                     <div className="mt-2 px-3 py-2 bg-pink-50 dark:bg-pink-950/30 border-2 border-pink-300 dark:border-pink-800 rounded-2xl text-sm text-pink-700 dark:text-pink-300 font-[var(--font-finger-paint)]">
                         {startError}
+                    </div>
+                )}
+
+                {/* Player Count */}
+                {server.players !== undefined && (
+                    <div className="mb-2 flex items-center gap-2 group/players relative">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-100 to-teal-100 dark:from-emerald-900/50 dark:to-teal-900/50 rounded-full text-xs font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 shadow-sm cursor-help transition-all hover:scale-105">
+                            <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Players:</div>
+                            <div className="text-sm font-mono text-emerald-900 dark:text-emerald-100">
+                                {server.players} / {server.maxPlayers}
+                            </div>
+                        </div>
+
+                        {/* Player List Tooltip */}
+                        {server.playerList && server.playerList.length > 0 && (
+                            <div className="absolute left-0 bottom-full mb-2 w-48 bg-white dark:bg-zinc-800 rounded-xl shadow-xl border border-emerald-100 dark:border-zinc-700 p-3 opacity-0 invisible group-hover/players:opacity-100 group-hover/players:visible transition-all duration-200 z-10">
+                                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Online Players</div>
+                                <div className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar">
+                                    {server.playerList.map((player, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                                            <span className="truncate">{player}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Arrow */}
+                                <div className="absolute left-6 bottom-[-6px] w-3 h-3 bg-white dark:bg-zinc-800 border-b border-r border-emerald-100 dark:border-zinc-700 rotate-45 transform" />
+                            </div>
+                        )}
                     </div>
                 )}
 
