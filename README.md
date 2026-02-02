@@ -1,4 +1,7 @@
-# Minecraft Server Status Dashboard
+
+# This was Completely Vibe Coded
+
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 A Next.js-based status dashboard for displaying Minecraft servers managed by Pelican Panel. Features real-time status updates, metadata-based filtering, and a modern, responsive UI.
 
