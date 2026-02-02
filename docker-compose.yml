@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  ericmcstatus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PELICAN_PANEL_URL=${PELICAN_PANEL_URL}
+      - PELICAN_API_KEY=${PELICAN_API_KEY}
+      - PELICAN_CLIENT_API_KEY=${PELICAN_CLIENT_API_KEY}
+    restart: unless-stopped
+    container_name: ericmcstatus
