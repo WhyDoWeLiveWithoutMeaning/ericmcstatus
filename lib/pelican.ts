@@ -94,6 +94,39 @@ async function fetchServerStatus(uuid: string): Promise<{ status: string | null;
 }
 
 /**
+ * Fetch a single egg details from Pelican Panel Application API
+ */
+async function fetchEgg(eggId: number): Promise<any> {
+    if (!PELICAN_PANEL_URL || !PELICAN_API_KEY) {
+        throw new PelicanAPIError('Pelican Panel configuration is missing');
+    }
+
+    try {
+        const response = await fetch(`${PELICAN_PANEL_URL}/api/application/eggs/${eggId}`, {
+            headers: {
+                'Authorization': `Bearer ${PELICAN_API_KEY}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            next: { revalidate: 3600 }, // Cache egg details for 1 hour
+        });
+
+        if (!response.ok) {
+            throw new PelicanAPIError(
+                `Failed to fetch egg ${eggId}: ${response.statusText}`,
+                response.status
+            );
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.warn(`Error fetching egg ${eggId}:`, error);
+        throw error;
+    }
+}
+
+
+/**
  * Fetch all servers from Pelican Panel Application API
  */
 export async function fetchServers(): Promise<Server[]> {
@@ -132,8 +165,32 @@ export async function fetchServers(): Promise<Server[]> {
             console.log('First server structure:', JSON.stringify(data.data[0], null, 2));
         }
 
+        // Fetch egg details for all unique eggs
+        const eggIds = [...new Set(data.data.map((server: any) => {
+            const attrs = server.attributes || server;
+            return attrs.egg;
+        }).filter((id: any) => typeof id === 'number'))] as number[];
+
+        console.log('Fetching details for eggs:', eggIds);
+
+        const eggs = await Promise.all(
+            eggIds.map(id => fetchEgg(id).catch((err: unknown) => {
+                console.warn(`Failed to fetch egg ${id}:`, err);
+                return null;
+            }))
+        );
+
+        const eggMap = new Map<number, string>();
+        eggs.forEach((egg: any) => {
+            if (egg && egg.attributes && egg.attributes.uuid) {
+                eggMap.set(egg.attributes.id, egg.attributes.uuid);
+            }
+        });
+
+        console.log('Egg Map:', Object.fromEntries(eggMap));
+
         // Transform Pelican API response to our internal format
-        const allServers = data.data.map(transformPelicanServer);
+        const allServers = data.data.map(server => transformPelicanServer(server, eggMap));
 
         // Filter to only show servers with "display:true" in external_id
         const displayServers = allServers.filter(server => {
@@ -186,7 +243,7 @@ export async function fetchServers(): Promise<Server[]> {
 /**
  * Transform Pelican server data to our internal Server format
  */
-function transformPelicanServer(pelicanServer: any): Server {
+function transformPelicanServer(pelicanServer: any, eggMap?: Map<number, string>): Server {
     // Handle JSON:API format where data is in 'attributes'
     const data = pelicanServer.attributes || pelicanServer;
     const metadata = parseMetadata(data.external_id);
@@ -204,6 +261,7 @@ function transformPelicanServer(pelicanServer: any): Server {
         subgroup: metadata['subgroup'] || undefined,
         image: data.container?.image || 'unknown',
         eggId: data.egg,
+        eggUuid: data.egg ? eggMap?.get(data.egg) : undefined,
         isInstalled: data.container?.installed === 1,
         updatedAt: data.updated_at || new Date().toISOString(),
     };

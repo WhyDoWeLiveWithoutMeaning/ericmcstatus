@@ -50,6 +50,7 @@ export interface Server {
     subgroup?: string;
     image: string; // Container image
     eggId?: number; // Egg ID for icon fallback
+    eggUuid?: string; // Egg UUID for icon fallback
     isInstalled: boolean;
     updatedAt: string;
 }

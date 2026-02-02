@@ -85,24 +85,30 @@ export function ServerCard({ server }: ServerCardProps) {
                                 const target = e.currentTarget;
                                 const currentSrc = target.src;
 
-                                // Fallback chain: server.png -> server.jpg -> egg.png -> egg.jpg -> letter
+                                // Fallback chain: server.png -> server.webp -> server.jpg -> egg.png -> egg.webp -> egg.jpg -> letter
                                 if (currentSrc.includes('/server/') && currentSrc.endsWith('.png')) {
+                                    // Try server .webp
+                                    target.src = `https://pelican.er-ic.ca/storage/icons/server/${server.uuid}.webp`;
+                                } else if (currentSrc.includes('/server/') && currentSrc.endsWith('.webp')) {
                                     // Try server .jpg
                                     target.src = `https://pelican.er-ic.ca/storage/icons/server/${server.uuid}.jpg`;
                                 } else if (currentSrc.includes('/server/') && currentSrc.endsWith('.jpg')) {
                                     // Try egg .png
-                                    if (server.eggId) {
-                                        target.src = `https://pelican.er-ic.ca/storage/icons/egg/${server.eggId}.png`;
+                                    if (server.eggUuid) {
+                                        target.src = `https://pelican.er-ic.ca/storage/icons/egg/${server.eggUuid}.png`;
                                     } else {
-                                        // No egg ID, skip to fallback
+                                        // No egg UUID, skip to fallback
                                         target.style.display = 'none';
                                         if (target.nextSibling) {
                                             (target.nextSibling as HTMLElement).style.display = 'flex';
                                         }
                                     }
                                 } else if (currentSrc.includes('/egg/') && currentSrc.endsWith('.png')) {
+                                    // Try egg .webp
+                                    target.src = `https://pelican.er-ic.ca/storage/icons/egg/${server.eggUuid}.webp`;
+                                } else if (currentSrc.includes('/egg/') && currentSrc.endsWith('.webp')) {
                                     // Try egg .jpg
-                                    target.src = `https://pelican.er-ic.ca/storage/icons/egg/${server.eggId}.jpg`;
+                                    target.src = `https://pelican.er-ic.ca/storage/icons/egg/${server.eggUuid}.jpg`;
                                 } else {
                                     // All failed, show letter fallback
                                     target.style.display = 'none';
@@ -118,12 +124,14 @@ export function ServerCard({ server }: ServerCardProps) {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                        <h3 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 dark:from-pink-400 dark:to-purple-400 bg-clip-text text-transparent mb-1 truncate font-[var(--font-finger-paint)]">
+                        <h3 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 dark:from-pink-400 dark:to-purple-400 bg-clip-text text-transparent mb-1 break-words leading-tight font-[var(--font-finger-paint)]">
                             {server.name}
                         </h3>
-                        <p className="text-sm text-purple-600 dark:text-pink-300 line-clamp-2">
-                            {server.description || 'No description available'}
-                        </p>
+                        {server.description && (
+                            <p className="text-sm text-purple-600 dark:text-pink-300 line-clamp-2">
+                                {server.description}
+                            </p>
+                        )}
                     </div>
 
                     {/* Status indicator */}
